@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# original folder/file names
+ORFOLDER='original-project-folder'     # path to original folder
+ORFILE="my_document"                   # don't include .tex ending
+
+# revised folder/file names
+REVFOLDER='new-project-folder'         # path to revised folder
+REVFILE="my_document"                  # don't include .tex ending
+
+# name of folder/file where diff will be generated
+DIFFFOLDER='diff'                      # path to diff folder
+DIFFFILE="diff"                        # don't include .tex ending
+
+# ==================================================================
+# don't edit anything below here!
+# ==================================================================
+
+CURRENT=$(pwd)
+
+mkdir -p $DIFFFOLDER
+mkdir -p $DIFFFOLDER/figures
+
+# copy bst, bib, cls and sty files
+for d in $REVFOLDER/*; do
+  var=${d#*.}
+  if [[ $var =~ ^(bst|bib|cls|sty|tex)$ ]]; then
+    cp $d $DIFFFOLDER
+  fi
+done
+
+# copy figures
+for d in $REVFOLDER/figures/*; do
+  var=${d#*.}
+  if [[ $var =~ ^(png|eps|pdf|jpg)$ ]]; then
+    cp $d $DIFFFOLDER/figures
+  fi
+done
+
+# generate diff tex file
+latexdiff --math-markup="off" --graphics-markup="new-only" --enable-citation-markup --ignore-warnings "$ORFOLDER/$ORFILE.tex" "$REVFOLDER/$REVFILE.tex" > "$DIFFFOLDER/$DIFFFILE.tex" #> /dev/null 2>&1
+
+# compile diff pdf
+cd "$DIFFFOLDER"
+DIFFFULL="$(pwd)"
+
+pdflatex -interaction nonstopmode -halt-on-error "$DIFFFILE.tex" #> /dev/null 2>&1
+#pdflatex "$DIFFFILE.tex" #> /dev/null 2>&1
+bibtex "$DIFFFILE" #> /dev/null 2>&1
+pdflatex -interaction nonstopmode -halt-on-error "$DIFFFILE.tex" #> /dev/null 2>&1
+pdflatex -interaction nonstopmode -halt-on-error "$DIFFFILE.tex" #> /dev/null 2>&1
+
+# remove all files except pdf
+#rm -r figures/
+#for d in *; do
+#  var="${d#*.}"
+#  if [ $var != "pdf" ]; then
+#    rm "$d"
+#  fi
+#done
+
+# go back to original directory
+cd "$CURRENT"
+
+# ending message
+echo "$DIFFFILE.pdf (and compilation files) can be found in:"
+echo "$DIFFFULL"
